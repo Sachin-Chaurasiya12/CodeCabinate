@@ -1,32 +1,119 @@
-import React, { useState } from "react";
-import { Globe2, Users, User, Search, Send, ArrowLeft, MessageCircle } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Client } from "@stomp/stompjs";
+import SockJS from "sockjs-client";
+import {
+  Globe2,
+  Users,
+  User,
+  Search,
+  Send,
+  ArrowLeft,
+  MessageCircle,
+} from "lucide-react";
 import "./Community.css";
 
 const ACCENT = "#6C5CE7";
+const WS_URL = "/ws"
 
-const chatConnections = [
-  { id: 1, fullName: "Full Name", color: "#E15C5C", lastMessage: "This is your message , you will get" },
-  { id: 2, fullName: "Full Name", color: "#3730E0", lastMessage: "Hey, are you free tomorrow?" },
-  { id: 3, fullName: "Full Name", color: "#2B8CFF", lastMessage: "Sounds good, talk soon" },
-  { id: 4, fullName: "Full Name", color: "#9B59F6", lastMessage: "Thanks for connecting!" },
-];
+const getToken = () => localStorage.getItem("accessToken");
 
-const initialDirectMessages = [
-  { id: 1, sender: "other", time: "23:00", text: "This is a client message the message will come here and look like this" },
-  { id: 2, sender: "other", time: "23:00", text: "The message will be hardcoded for sometime" },
-  { id: 3, sender: "me", time: "23:00", text: "This is your message , you will get" },
-  { id: 4, sender: "me", time: "23:00", text: "it on this side" },
-];
+const formatTime = (value) =>
+  value
+    ? new Date(value).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
 
-export default function ConnectionsPage({ onOpenCommunity, onOpenSearch }) {
-  const [view, setView] = useState("connections"); // "connections" | "chat"
+export default function ConnectionsPage({
+  onOpenCommunity,
+  onOpenSearch,
+  connectedUsers,
+  refreshConnections,
+}) {
+  const [view, setView] = useState("connections");
   const [activeChatUser, setActiveChatUser] = useState(null);
-  const [messages, setMessages] = useState(initialDirectMessages);
+  const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
 
+  const clientRef = useRef(null);
+  const activeChatUserRef = useRef(null);
+  const bottomRef = useRef(null);
+
+  // map backend message -> UI message
+  const toUiMessage = (m, otherUserId) => ({
+    id: m.id ?? `${m.createdAt}-${m.senderId}-${Math.random()}`,
+    sender: m.senderId === otherUserId ? "other" : "me",
+    time: formatTime(m.createdAt),
+    text: m.content,
+  });
+
+  // keep ref in sync so the websocket callback sees the current chat
+  useEffect(() => {
+    activeChatUserRef.current = activeChatUser;
+  }, [activeChatUser]);
+
+  // websocket connection (once)
+  useEffect(() => {
+    const client = new Client({
+    webSocketFactory: () => new SockJS(WS_URL),
+    connectHeaders: { Authorization: `Bearer ${getToken()}` },
+    reconnectDelay: 5000,
+    onConnect: () => {
+      client.subscribe("/user/queue/messages", (frame) => {
+        const m = JSON.parse(frame.body);
+        const current = activeChatUserRef.current;
+      
+        // only show it if that chat is open
+        if (current && m.senderId === current.userId) {
+          setMessages((prev) => [...prev, toUiMessage(m, current.userId)]);
+        }
+      });
+    },
+    onStompError: (frame) => console.error("STOMP error:", frame),
+    onWebSocketError: (error) => console.error("WebSocket error:", error),
+  });
+
+    client.activate();
+    clientRef.current = client;
+
+    return () => client.deactivate();
+  }, []);
+
+  // load history when a chat is opened
+  useEffect(() => {
+    if (!activeChatUser) return;
+
+    const loadHistory = async () => {
+      try {
+        const res = await fetch(
+          `/Community/privatemessage/${activeChatUser.userId}?page=0&size=50`,
+          { headers: { Authorization: `Bearer ${getToken()}` } }
+        );
+        if (!res.ok) throw new Error("Failed to load messages");
+
+        const data = await res.json();
+        const sorted = [...data].sort(
+          (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+        );
+        setMessages(sorted.map((m) => toUiMessage(m, activeChatUser.userId)));
+      } catch (err) {
+        console.error(err);
+        setMessages([]);
+      }
+    };
+
+    loadHistory();
+  }, [activeChatUser]);
+
+  // scroll to latest message
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
   const openChat = (user) => {
+    setMessages([]);
     setActiveChatUser(user);
-    setMessages(initialDirectMessages);
     setView("chat");
   };
 
@@ -36,11 +123,31 @@ export default function ConnectionsPage({ onOpenCommunity, onOpenSearch }) {
   };
 
   const sendMessage = () => {
-    if (!draft.trim()) return;
+    const content = draft.trim();
+    if (!content || !activeChatUser) return;
+
+    const client = clientRef.current;
+    if (!client || !client.connected) return;
+
+    client.publish({
+      destination: "/app/private.send",
+      body: JSON.stringify({
+        recipientId: activeChatUser.userId,
+        content,
+      }),
+    });
+
+    // the server only pushes to the recipient, so add our own message locally
     setMessages((prev) => [
       ...prev,
-      { id: Date.now(), sender: "me", time: "23:00", text: draft.trim() },
+      {
+        id: Date.now(),
+        sender: "me",
+        time: formatTime(new Date()),
+        text: content,
+      },
     ]);
+
     setDraft("");
   };
 
@@ -57,7 +164,11 @@ export default function ConnectionsPage({ onOpenCommunity, onOpenSearch }) {
         <div className="chat-panel">
           <div className="chat-header">
             {isChatView && (
-              <button onClick={backToList} className="back-btn" aria-label="Back">
+              <button
+                onClick={backToList}
+                className="back-btn"
+                aria-label="Back"
+              >
                 <ArrowLeft size={20} className="back-icon" />
               </button>
             )}
@@ -66,15 +177,27 @@ export default function ConnectionsPage({ onOpenCommunity, onOpenSearch }) {
               <>
                 <div
                   className="chat-header-avatar"
-                  style={{ backgroundColor: activeChatUser?.color }}
+                  style={{
+                    backgroundColor: ACCENT,
+                    backgroundImage: activeChatUser?.avatarsecureurl
+                      ? `url(${activeChatUser.avatarsecureurl})`
+                      : "none",
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }}
                 />
+
                 <h2 className="chat-header-title chat-header-title-muted">
-                  {activeChatUser?.fullName}
+                  {activeChatUser?.fullname}
                 </h2>
               </>
             ) : (
               <>
-                <div className="chat-header-bar" style={{ backgroundColor: ACCENT }} />
+                <div
+                  className="chat-header-bar"
+                  style={{ backgroundColor: ACCENT }}
+                />
+
                 <h2 className="chat-header-title">Connections</h2>
               </>
             )}
@@ -86,16 +209,31 @@ export default function ConnectionsPage({ onOpenCommunity, onOpenSearch }) {
                 {messages.map((m) => (
                   <div
                     key={m.id}
-                    className={`message-row ${m.sender === "me" ? "message-row-me" : "message-row-other"}`}
-                  >
+                    className={`message-row ${
+                      m.sender === "me" ? "message-row-me" : "message-row-other"
+                    }`}
+                    style={{
+                      display: "flex",
+                      justifyContent: m.sender === "me" ? "flex-end" : "flex-start",
+                    }}
+                    >
                     <div
-                      className={`message-bubble ${m.sender === "me" ? "message-bubble-me" : "message-bubble-other"}`}
-                      style={m.sender === "me" ? { backgroundColor: "#D9D3FA" } : undefined}
+                      className={`message-bubble ${
+                        m.sender === "me"
+                          ? "message-bubble-me"
+                          : "message-bubble-other"
+                      }`}
+                      style={
+                        m.sender === "me"
+                          ? { backgroundColor: "#D9D3FA", color: "#2D2A4A" }
+                          : undefined
+                      }
                     >
                       {m.text}
                     </div>
                   </div>
                 ))}
+                <div ref={bottomRef} />
               </div>
 
               <div className="composer">
@@ -107,6 +245,7 @@ export default function ConnectionsPage({ onOpenCommunity, onOpenSearch }) {
                     placeholder="Send Message here..."
                     className="composer-input"
                   />
+
                   <button
                     onClick={sendMessage}
                     className="composer-send-btn"
@@ -120,21 +259,36 @@ export default function ConnectionsPage({ onOpenCommunity, onOpenSearch }) {
             </>
           ) : (
             <div className="connections-list">
-              {chatConnections.map((c) => (
-                <div key={c.id} className="connection-row">
+              {connectedUsers.map((user) => (
+                <div key={user.userId} className="connection-row">
                   <div className="connection-avatar-wrap">
-                    <div className="connection-avatar" style={{ backgroundColor: c.color }} />
+                    <div
+                      className="connection-avatar"
+                      style={{
+                        backgroundColor: ACCENT,
+                        backgroundImage: user.avatarsecureurl
+                          ? `url(${user.avatarsecureurl})`
+                          : "none",
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                        backgroundRepeat: "no-repeat",
+                      }}
+                    />
+
                     <span className="connection-status-dot" />
                   </div>
+
                   <div className="connection-info">
-                    <div className="connection-name">{c.fullName}</div>
-                    <div className="connection-lastmsg">{c.lastMessage}</div>
+                    <div className="connection-name">{user.fullname}</div>
+
+                    <div className="connection-lastmsg">@{user.username}</div>
                   </div>
+
                   <button
                     className="connection-message-btn"
                     style={{ backgroundColor: ACCENT }}
-                    onClick={() => openChat(c)}
-                    aria-label={`Message ${c.fullName}`}
+                    onClick={() => openChat(user)}
+                    aria-label={`Message ${user.fullname}`}
                   >
                     <MessageCircle size={16} />
                     Message
@@ -153,6 +307,7 @@ export default function ConnectionsPage({ onOpenCommunity, onOpenSearch }) {
           >
             <Globe2 size={20} className="icon-accent" />
           </button>
+
           <button
             className="sidebar-btn"
             style={{ backgroundColor: ACCENT }}
@@ -160,6 +315,7 @@ export default function ConnectionsPage({ onOpenCommunity, onOpenSearch }) {
           >
             <Users size={20} className="icon-white" />
           </button>
+
           <button
             onClick={onOpenSearch}
             className="sidebar-btn sidebar-btn-hover"

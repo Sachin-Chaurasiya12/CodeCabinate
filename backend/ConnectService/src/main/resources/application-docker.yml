@@ -10,3 +10,4 @@ spring.datasource.hikari.connection-timeout=30000
 spring.datasource.hikari.initialization-fail-timeout=60000
 
 jwt.secret=${JWT_SECRET}
+stomp.web.allowed-origins=${STOMP_WEB_ALLOWED_ORIGINS}

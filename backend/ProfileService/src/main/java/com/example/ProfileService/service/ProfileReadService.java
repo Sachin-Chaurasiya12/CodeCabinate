@@ -1,5 +1,8 @@
 package com.example.ProfileService.service;
 
+import org.springframework.cloud.context.named.NamedContextFactory.Specification;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -10,8 +13,10 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import com.example.ProfileService.Exception.ProfileNotFoundException;
+import com.example.ProfileService.common.SearchSpecification;
 import com.example.ProfileService.model.Profile;
 import com.example.ProfileService.model.Dto.ProfileResponsedto;
+import com.example.ProfileService.model.Dto.SearchProfile;
 import com.example.ProfileService.repository.ProfileRepository;
 import com.example.ProfileService.service.Interface.IProfileReadService;
 
@@ -90,6 +95,40 @@ public class ProfileReadService implements IProfileReadService{
 
     return dto;
 }
-    
+
+    @Override
+    public Page<SearchProfile> getallprofile(Pageable pageable,String searchTerm) {
+        
+        if(searchTerm == null || searchTerm.isEmpty()){
+            return Page.empty(pageable);
+        }
+        
+        SearchSpecification specification = new SearchSpecification(searchTerm);
+        return repository.findAll(specification, pageable)
+                    .map(profile -> new SearchProfile(
+                        profile.getUsername(),
+                        profile.getFullname(),
+                        profile.getAvatarPublicId(),
+                        profile.getAvatarSecureUrl(),
+                        profile.getUserId()
+                    ));
+    }
+
+    @Override
+    public SearchProfile getConnectProfile(Long userid) {
+        
+        Profile profile = repository.findByUserId(userid).orElseThrow(
+            () -> new ProfileNotFoundException("Profile doesn't exist")
+        );
+
+        SearchProfile profile2 = new SearchProfile();
+        profile2.setUserId(profile.getUserId());
+        profile2.setUsername(profile.getUsername());
+        profile2.setFullname(profile.getFullname());
+        profile2.setAvatarpublicid(profile.getAvatarPublicId());
+        profile2.setAvatarsecureurl(profile.getAvatarSecureUrl());
+
+        return profile2;
+    }
     
 }

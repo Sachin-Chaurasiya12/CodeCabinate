@@ -128,11 +128,12 @@
 
 .community-page {
   width: 100%;
-  height: 110vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   background: #fff;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow: hidden;
 }
 
 .community-topbar {
@@ -159,14 +160,18 @@
   line-height: 1;
 }
 
+
 .community-body {
   display: flex;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
 .chat-panel {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: #f9fafb;
@@ -176,7 +181,6 @@
   overflow: hidden;
   position: relative;
 }
-
 .chat-header {
   display: flex;
   align-items: center;
@@ -310,11 +314,11 @@
 
 .messages-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px 24px;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
   gap: 12px;
 }
 
@@ -454,6 +458,8 @@
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
   padding: 24px;
   position: relative;
+  min-height: 500px;
+  max-height: 500px;
 }
 
 .search-close-btn {
@@ -512,7 +518,38 @@
   max-height: 320px;
   overflow-y: auto;
 }
+.no-search-image {
+  width: 200px;
+  height: 175px;
+  object-fit: contain;
+  margin-bottom: 12px;
+}
 
+.search-no-results {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px 20px;
+}
+/* Scrollbar */
+.search-results::-webkit-scrollbar {
+  width: 6px;
+}
+
+.search-results::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.search-results::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 9999px;
+}
+
+.search-results::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
 .search-result-row {
   display: flex;
   align-items: center;

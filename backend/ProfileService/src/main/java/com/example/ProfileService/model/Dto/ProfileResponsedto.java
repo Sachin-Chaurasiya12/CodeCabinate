@@ -29,6 +29,7 @@ public class ProfileResponsedto {
     public ProfileResponsedto() {
     }
 
+
     public ProfileResponsedto(Long id, Long userId, String username, String fullname,
                               String email, String bio, Integer snippets,
                               Integer solved, String phonenumber, String city,
@@ -56,6 +57,7 @@ public class ProfileResponsedto {
         this.bannerSecureUrl = bannerSecureUrl;
         this.joined_at = joined_at;
     }
+
 
     public Long getId() {
         return id;

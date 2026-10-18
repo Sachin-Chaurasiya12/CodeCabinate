@@ -63,7 +63,6 @@ export default function LayoutShell() {
         }
 
         const data = await response.json();
-        console.log("Profile data:", data);
 
         setProfile({
           name: data.fullname || data.name || data.fullName || "",

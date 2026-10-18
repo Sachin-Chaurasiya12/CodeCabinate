@@ -26,37 +26,37 @@ public class JwtFilter extends OncePerRequestFilter{
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        
-            String authHeader = request.getHeader("Authorization");
 
-            if(authHeader == null || !authHeader.startsWith("Bearer ")){
-                filterChain.doFilter(request, response);
-                return;
+        String authHeader = request.getHeader("Authorization");
+
+        if(authHeader == null || !authHeader.startsWith("Bearer ")){
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        String token = authHeader.substring(7);
+
+        try {
+            boolean valid = jwtService.ValidateToken(token);
+            if(valid){
+
+                Long userId = jwtService.extractUserId(token);
+
+                UsernamePasswordAuthenticationToken authentication = 
+                    new UsernamePasswordAuthenticationToken(userId,
+                        null,
+                        List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                    );
+
+                SecurityContextHolder.getContext().setAuthentication(authentication);
             }
 
-            String token = authHeader.substring(7);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
-            try {
-                boolean valid = jwtService.ValidateToken(token);
-
-                if(valid){
-
-                    Long userid = jwtService.extractUserId(token);
-
-                    UsernamePasswordAuthenticationToken authentication = 
-                         new UsernamePasswordAuthenticationToken(userid,
-                            null,
-                            List.of(new SimpleGrantedAuthority("ROLE_USER"))    
-                        );
-                        
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        
         filterChain.doFilter(request, response);
+        
     }
-
     
 }

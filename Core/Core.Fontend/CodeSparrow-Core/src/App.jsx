@@ -38,7 +38,7 @@
         <Route path="/Inventory" element={<InventoryPage />} />
         <Route path="/new" element={<NewSnippetPage />} />
         <Route path="/view/:id" element={<ViewUpdateSnippetPage />} />
-        <Route path="/connect/community" element={<ConnectRouter />}/>
+        <Route path="/community" element={<ConnectRouter />}/>
         {/* <Route 
           path="/internal/profilesetting"
           element={

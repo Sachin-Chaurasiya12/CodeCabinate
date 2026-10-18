@@ -18,7 +18,7 @@ public class CorsConfig {
                 new CorsConfiguration();
 
         configuration.setAllowedOrigins(
-                List.of("http://localhost")
+                List.of("http://localhost","https://*.trycloudflare.com")
         );
 
         configuration.setAllowedMethods(

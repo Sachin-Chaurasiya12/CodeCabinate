@@ -7,7 +7,7 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "profiles")
+@Table(name = "profiles",indexes = @Index(name="idx_userId", columnList = "userId"))
 
 public class Profile {
 

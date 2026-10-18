@@ -1,12 +1,11 @@
-package com.example.ConnectService.model.DTO;
+package com.example.ConnectService.model.dto;
 
 public class SendMessageRequest {
-    
     private String content;
-    private Long replyToMessageId;
+    private Long replyToMessageId;    
 
     public SendMessageRequest(){}
-    
+
     public String getContent() {
         return content;
     }

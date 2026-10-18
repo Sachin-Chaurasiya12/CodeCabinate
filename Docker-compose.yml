@@ -192,13 +192,21 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+
       JWT_SECRET: ${JWT_SECRET}
+      STOMP_WEB_ALLOWED_ORIGINS: ${STOMP_WEB_ALLOWED_ORIGINS}
 
     ports:
       - "8085:8085"
+      - "5005:5005"
+
+    command:
+      - "spring-boot:run"
+      - "-Dspring-boot.run.jvmArguments=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
 
     volumes:
       - ./backend/ConnectService:/app
@@ -212,7 +220,7 @@ services:
 
     networks:
       - codesparrow-net
-
+      
   service-registry:
     build:
       context: ./backend/Service-registry

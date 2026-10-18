@@ -20,60 +20,53 @@ public class JwtService {
     private String secret;
 
     public SecretKey getSigningKey(){
-        
-        byte[] bytesKey = Decoders.BASE64.decode(secret);
 
-        return Keys.hmacShaKeyFor(bytesKey);
+        byte[] byteKey = Decoders.BASE64.decode(secret);
+
+        return Keys.hmacShaKeyFor(byteKey);
     }
 
     public String extractUsername(String token){
-
         return extractClaims(token,
-            Claims::getSubject
-        );
+            Claims::getSubject);
     }
 
     public Long extractUserId(String token){
-
         return extractClaims(token,
-            Claims -> Claims.get("userId", Long.class)
-        );
+            Claims -> Claims.get("userId", Long.class));
     }
 
     public Date extractExpiration(String token){
-
         return extractClaims(token,
             Claims::getExpiration
         );
     }
 
-    public <T> T extractClaims(String token, Function<Claims, T> resolver){
+    public <T> T extractClaims(String token, Function<Claims,T> resolver){
 
         Claims claims = extractAllClaims(token);
-
         return resolver.apply(claims);
+
     }
 
     private Claims extractAllClaims(String token){
         return Jwts.parser()
-            .verifyWith(
-                getSigningKey()
-            ).build()
-            .parseSignedClaims(token)
-            .getPayload();
+                .verifyWith(
+                    getSigningKey()
+                ).build()
+                .parseSignedClaims(token)
+                .getPayload();
     }
 
     public boolean ValidateToken(String token){
         try {
-            
-        Claims claims = extractAllClaims(token);
+            Claims claims = extractAllClaims(token);
 
-        return claims.getExpiration() == null 
-            || claims.getExpiration().after(new Date());
+            return claims.getExpiration() == null || 
+            claims.getExpiration().after(new Date());
         } catch (Exception e) {
             System.out.println(
-                "Token is Invalid" + 
-                e.getMessage()
+                "Inalid token" + e.getMessage()
             );
             return false;
         }

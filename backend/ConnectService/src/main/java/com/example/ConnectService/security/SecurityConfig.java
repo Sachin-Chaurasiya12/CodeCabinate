@@ -16,7 +16,6 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception{
-        
         return http
             .csrf(Customizer -> Customizer.disable())
             .authorizeHttpRequests(request -> 
@@ -25,11 +24,12 @@ public class SecurityConfig {
                     "/swagger-ui/**",
                     "/swagger-ui.html"
                 ).permitAll()
-                .anyRequest().authenticated()
+                .requestMatchers("/ws/**").permitAll()
+                .anyRequest().authenticated()   
             )
-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
             .httpBasic(Customizer -> Customizer.disable())
             .formLogin(form -> form.disable())
+            .addFilterBefore(jwtFilter,UsernamePasswordAuthenticationFilter.class)
             .sessionManagement(session -> 
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )

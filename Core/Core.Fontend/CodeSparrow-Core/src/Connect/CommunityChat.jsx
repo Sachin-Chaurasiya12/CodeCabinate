@@ -24,7 +24,6 @@ const formatTime = (createdAt) => {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 };
 
-// Decode userId from the JWT payload, same token source ProfileApp uses
 const getCurrentUserId = () => {
   try {
     const token = localStorage.getItem("accessToken");
@@ -49,6 +48,7 @@ export default function CommunityChat({ onOpenConnections, onOpenSearch }) {
   const [draft, setDraft] = useState("");
   const [hasJoined, setHasJoined] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  const [termsLoading, setTermsLoading] = useState(true);
   const stompClientRef = useRef(null);
   const messagesEndRef = useRef(null);
   const currentUserId = getCurrentUserId();
@@ -58,39 +58,95 @@ export default function CommunityChat({ onOpenConnections, onOpenSearch }) {
 
     const token = localStorage.getItem("accessToken");
 
-    fetch(API_BASE, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => setMessages(Array.isArray(data) ? data : []))
-      .catch(() => setMessages([]));
-
     const client = new Client({
-      webSocketFactory: () => new SockJS(WS_URL),
-      connectHeaders: { Authorization: `Bearer ${token}` },
-      reconnectDelay: 5000,
-      onConnect: () => {
-        client.subscribe("/topic/community", (msg) => {
-        const body = JSON.parse(msg.body);
-              
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === body.id)) {
-            return prev;
-          }
-        
-          return [...prev, body];
-        });
-      });
-      },  
+        webSocketFactory: () => new SockJS(WS_URL),
+        connectHeaders: {
+            Authorization: `Bearer ${token}`,
+        },
+        reconnectDelay: 5000,
+
+        onConnect: () => {
+
+            client.subscribe("/topic/community", (msg) => {
+                const body = JSON.parse(msg.body);
+
+                setMessages((prev) => {
+                    const exists = prev.some(
+                      (m) => String(m.id) === String(body.id)
+                    );
+                  
+                    if (exists) {
+                      return prev;
+                    }
+                  
+                    return [...prev, body];
+                  });
+            });
+        },
+
+        onStompError: (frame) => {
+            console.error("STOMP error:", frame);
+        },
+
+        onWebSocketError: (error) => {
+            console.error("WebSocket error:", error);
+        },
     });
 
-    client.activate();
     stompClientRef.current = client;
+    fetch(API_BASE, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        })
+            .then((res) => {
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}`);
+                }
+              
+                return res.json();
+            })
+            .then((data) => {
 
-    return () => {
-      client.deactivate();
-    };
-  }, [hasJoined]);
+                if (Array.isArray(data)) {
+                    data.forEach((message, index) => {
+                    });
+                }
+              
+                if (!Array.isArray(data)) {
+                    setMessages([]);
+                    return;
+                }
+              
+                const uniqueMessages = Array.from(
+                    new Map(
+                        data.map((message) => [
+                            String(message.id),
+                            message,
+                        ])
+                    ).values()
+                );
+              
+              
+                setMessages(
+                  uniqueMessages.sort(
+                    (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+                  )
+                );
+            })
+            .catch((error) => {
+                setMessages([]);
+            });
+          
+        client.activate();  
+          
+        return () => {
+        
+            client.deactivate();
+        
+            stompClientRef.current = null;
+        };
+    }, [hasJoined]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -104,7 +160,68 @@ export default function CommunityChat({ onOpenConnections, onOpenSearch }) {
     });
     setDraft("");
   };
+  useEffect(() => {
+    const token = localStorage.getItem("accessToken");
 
+    if (!token) {
+        setTermsLoading(false);
+        return;
+    }
+
+    fetch("/Community/terms", {
+        method: "GET",
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    })
+        .then((res) => {
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
+            }
+
+            return res.json();
+        })
+        .then((termsChecked) => {
+              setHasJoined(termsChecked === true);
+          })
+        .catch((error) => {
+            console.error("Failed to check community terms:", error);
+            setHasJoined(false);
+        })
+        .finally(() => {
+            setTermsLoading(false);
+        });
+}, []);
+const joinCommunity = async () => {
+    if (!agreed) return;
+
+    const token = localStorage.getItem("accessToken");
+
+    try {
+        const response = await fetch("/Community/terms", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+                termreq: true,
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        // Only show the community after backend successfully saves it
+        setHasJoined(true);
+    } catch (error) {
+        console.error("Failed to save community terms:", error);
+    }
+};
+if (termsLoading) {
+    return null;
+}
   return (
     <div className="community-page">
       <div className="community-topbar">
@@ -157,7 +274,7 @@ export default function CommunityChat({ onOpenConnections, onOpenSearch }) {
                   className="join-community-btn"
                   style={{ backgroundColor: ACCENT }}
                   disabled={!agreed}
-                  onClick={() => setHasJoined(true)}
+                  onClick={joinCommunity}
                 >
                   Join Community
                 </button>
