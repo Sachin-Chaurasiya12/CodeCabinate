@@ -84,6 +84,13 @@ export default function ConnectRouter({ onBack }) {
       const data = await response.json();
 
       const newUsers = data.content || [];
+      setConnected((prev) => {
+          const next = { ...prev };
+          newUsers.forEach((u) => {
+            if (u.isFollowing) next[String(u.userId)] = true;
+          });
+          return next;
+        });
 
       if (!append) {
         setUsers(newUsers);
@@ -120,9 +127,7 @@ const fetchConnections = async () => {
 
     const response = await fetch("/connect/displaychat", {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     });
 
     if (!response.ok) {
@@ -130,18 +135,7 @@ const fetchConnections = async () => {
     }
 
     const data = await response.json();
-
-    const users = data || [];
-
-    setConnectedUsers(users);
-
-    const connectedMap = {};
-
-    users.forEach((user) => {
-      connectedMap[user.userId] = true;
-    });
-
-    setConnected(connectedMap);
+    setConnectedUsers(data || []);
   } catch (error) {
     console.error("Error fetching connections:", error);
     setConnectedUsers([]);

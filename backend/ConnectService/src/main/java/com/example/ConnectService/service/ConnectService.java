@@ -4,8 +4,10 @@ package com.example.ConnectService.service;
 import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
@@ -116,17 +118,9 @@ public class ConnectService implements IConnectService{
             repo.save(chat);
         }   
 
-        boolean followingtouser = repo.existsByFolloweridAndFollowingid(followingid, userid);
-
-        Boolean canChat = false;
-
-        if(usertofollowing || followingtouser){
-            canChat = true;
-        }   
-
         Connectiondata data = new Connectiondata();
 
-        data.setCanChat(canChat);
+        data.setCanChat(true);
         data.setFollowerid(userid);
         data.setFollowingid(followingid);
 
@@ -137,9 +131,10 @@ public class ConnectService implements IConnectService{
     @Override
     public List<SearchProfile> getFollowerandfollowinglist(Long userid) {
 
-        List<ConnectChat> connections = repo.findByFollowerid(userid);
+        List<ConnectChat> connections = repo.findByFolloweridOrFollowingid(userid,userid);
 
         List<SearchProfile> profiles = new ArrayList<>();
+        Set<Long> addeduserid = new HashSet<>();
 
         HttpServletRequest request = ((ServletRequestAttributes)
             RequestContextHolder.currentRequestAttributes())
@@ -154,7 +149,12 @@ public class ConnectService implements IConnectService{
 
         for(ConnectChat chat : connections){
 
-            Long OtherUserid = chat.getFollowingid();
+            Long OtherUserid = chat.getFollowerid().equals(userid) 
+                ? chat.getFollowingid() : chat.getFollowerid();
+
+            if(!addeduserid.add(OtherUserid)){
+                continue;
+            }
 
             try {
 
